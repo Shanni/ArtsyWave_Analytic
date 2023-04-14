@@ -7,6 +7,7 @@ import { useWallet } from "@aptos-labs/wallet-adapter-react";
 import "@aptos-labs/wallet-adapter-ant-design/dist/index.css";
 import { CheckboxChangeEvent } from "antd/es/checkbox";
 import { Network, Provider } from "aptos";
+import { ApolloClient, InMemoryCache, ApolloProvider, gql, useQuery } from '@apollo/client';
 
 type Task = {
   address: string;
@@ -14,6 +15,28 @@ type Task = {
   content: string;
   task_id: string;
 };
+
+const client = new ApolloClient({
+  uri: 'https://indexer-testnet.staging.gcp.aptosdev.com/v1/graphql',
+  cache: new InMemoryCache(),
+});
+
+
+const GET_LOCATIONS = gql`
+      query GetLocations {
+        current_token_ownerships(
+          where: {owner_address: {_eq: "0xaa921481e07b82a26dbd5d3bc472b9ad82d3e5bfd248bacac160eac51687c2ff"}, amount: {_gt: "0"}, table_type: {_eq: "0x3::token::TokenStore"}}
+          order_by: {last_transaction_version: desc}
+          offset: 0
+        ) {
+          token_data_id_hash
+          name
+          collection_name
+          property_version
+          amount
+      }
+      }
+    `
 
 export const provider = new Provider(Network.DEVNET);
 // change this to be your module account address
@@ -25,6 +48,8 @@ function App() {
   const { account, signAndSubmitTransaction } = useWallet();
   const [accountHasList, setAccountHasList] = useState<boolean>(false);
   const [transactionInProgress, setTransactionInProgress] = useState<boolean>(false);
+  const { loading, error, data } = useQuery(GET_LOCATIONS);
+  console.log(data)
 
   const onWriteTask = (event: React.ChangeEvent<HTMLInputElement>) => {
     const value = event.target.value;
@@ -172,8 +197,32 @@ function App() {
     fetchList();
   }, [account?.address]);
 
+  function DisplayLocations() {
+    const { loading, error, data } = useQuery(GET_LOCATIONS);
+  
+    if (loading) return <p>Loading...</p>;
+    if (error) return <p>Error : {error.message}</p>;
+  
+    const dataObj = {"data":{"current_token_ownerships":[{"token_data_id_hash":"f344b838264bf9aa57d5d4c1e0c8e6bbdc93f000abe3e7f050c2a0f4dc23d030","name":"Bruh Bear #1710","collection_name":"TESTNET BRUH","property_version":0,"amount":1}]}}
+    return data.locations.map(() => (
+      <div key={data.token_data_id_hash}>
+        <h3>{data.name}</h3>
+
+        <p>{data.collection_name}</p>
+        <p>{data.amount}</p>
+        <br />
+      </div>
+    ));
+  }
+    
+  
+
   return (
     <>
+    
+    
+      {/* <ApolloProvider client={client}>
+      <DisplayLocations />
       <Layout>
         <Row align="middle">
           <Col span={10} offset={2}>
@@ -250,6 +299,7 @@ function App() {
           </Row>
         )}
       </Spin>
+      </ApolloProvider> */}
     </>
   );
 }
